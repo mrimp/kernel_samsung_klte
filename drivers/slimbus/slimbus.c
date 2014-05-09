@@ -319,7 +319,7 @@ static void slim_report(struct work_struct *work)
 		return;
 	ret = slim_get_logical_addr(sbdev, sbdev->e_addr, 6, &laddr);
 
-#if defined(CONFIG_MACH_KLTE_TMO) || defined(CONFIG_MACH_KLTE_CAN)
+#if defined(CONFIG_MACH_KLTE_TMO) || defined(CONFIG_MACH_KLTE_CAN) || defined(CONFIG_MACH_KLTE_MTR)
 	if (system_rev == 0xd) {
 		pr_info("%s : system rev = %d\n", __func__, system_rev);
 		if ((ret == -ENXIO) &&

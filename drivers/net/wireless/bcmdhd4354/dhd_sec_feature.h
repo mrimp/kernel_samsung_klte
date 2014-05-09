@@ -53,6 +53,7 @@
  *    - 403 : USA VZW
  *    - 404 : USA SPR
  *    - 405 : USA USC
+ *    - 406 : CAN OPEN
  *    You can refer how to using it below this file.
  *    And, you can add more region code, too.
  */
@@ -183,6 +184,11 @@
 #undef TX_CALLING_POWER
 #define TX_CALLING_POWER 7
 #endif /* CONFIG_WLAN_REGION_CODE == 405 */
+
+#if (CONFIG_WLAN_REGION_CODE == 406) /* CAN */
+#undef TX_CALLING_POWER
+#define TX_CALLING_POWER 9
+#endif /* CONFIG_WLAN_REGION_CODE == 406 */
 
 #endif /* CONFIG_WLAN_REGION_CODE >= 400 && CONFIG_WLAN_REGION_CODE < 500 */
 

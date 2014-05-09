@@ -308,8 +308,6 @@
 			pn547,irq-gpio = <&msmgpio 59 0x00>;
 			pn547,ven-gpio = <&pma8084_gpios 9 0x00>;
 			pn547,firm-expander-gpio = <311>;
-			pn547,scl-gpio = <&msmgpio 3 0>;
-			pn547,sda-gpio = <&msmgpio 2 0>;
 		};
 		ncp6335b@1c {
 			compatible = "ncp6335b,camera-dcdc";

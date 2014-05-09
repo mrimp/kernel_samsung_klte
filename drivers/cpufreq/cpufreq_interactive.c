@@ -299,10 +299,12 @@ static void cpufreq_interactive_timer_start(int cpu)
 	unsigned long flags;
 
 	pcpu->cpu_timer.expires = expires;
+	del_timer_sync(&pcpu->cpu_timer);
 	add_timer_on(&pcpu->cpu_timer, cpu);
 	if (timer_slack_val >= 0 && pcpu->target_freq > pcpu->policy->min) {
 		expires += usecs_to_jiffies(timer_slack_val);
 		pcpu->cpu_slack_timer.expires = expires;
+		del_timer_sync(&pcpu->cpu_slack_timer);
 		add_timer_on(&pcpu->cpu_slack_timer, cpu);
 	}
 

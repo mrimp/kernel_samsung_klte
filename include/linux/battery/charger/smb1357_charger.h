@@ -268,6 +268,12 @@
 #define IRQ_G_REG			0x56
 #define IRQ_G_SRC_DETECT_BIT		BIT(6)
 
+#if defined(CONFIG_MFD_MAX77804K)
+#ifndef MAX77804K_CHGIN_IM
+#define MAX77804K_CHGIN_IM		(1 << 6)
+#endif
+#endif
+
 enum {
 	WRKARND_USB100_BIT = BIT(0),
 	WRKARND_APSD_FAIL = BIT(1),

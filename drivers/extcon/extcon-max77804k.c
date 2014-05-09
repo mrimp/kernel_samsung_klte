@@ -156,6 +156,7 @@ static int switch_sel;
 static int if_pmic_rev;
 
 int is_cardock;
+static bool is_lpm_mode;
 EXPORT_SYMBOL(is_cardock);
 
 void max77804k_update_jig_state(struct max77804k_muic_info *info);
@@ -1370,7 +1371,12 @@ static int max77804k_muic_handle_attach(struct max77804k_muic_info *info,
 		} else
 #endif
 		{
-			dev_warn(info->dev, "unsupported adc=0x%x\n", adc);
+			if (is_lpm_mode && vbvolt) {
+				dev_warn(info->dev, "Incompatible adc=0x%x\n", adc);
+				new_state = BIT(EXTCON_INCOMPATIBLE);
+			} else {
+				dev_warn(info->dev, "unsupported adc=0x%x\n", adc);
+			}
 		}
 		break;
 	}
@@ -1555,6 +1561,19 @@ struct booster_data sec_booster = {
 	.boost = muic_otg_control,
 };
 #endif
+
+static int __init get_lpm_mode(char *str)
+{
+	if (!strncasecmp(str, "lpm", 3)) {
+		pr_info("%s:lpm mode\n", __func__);
+		is_lpm_mode = true;
+	} else {
+		pr_info("%s:not lpm mode\n", __func__);
+		is_lpm_mode = false;
+	}
+	return 0;
+}
+__setup("androidboot.baseband=", get_lpm_mode);
 
 static int __devinit max77804k_muic_probe(struct platform_device *pdev)
 {

@@ -24,12 +24,13 @@
 #ifdef CONFIG_USB_HOST_NOTIFY
 #include <linux/host_notify.h>
 #endif
+#include <mach/sec_debug.h>
 
 #define	SIOP_INPUT_LIMIT_CURRENT 1200
 #define	SIOP_CHARGING_LIMIT_CURRENT 1000
 #define SIOP_CHARGING_CURRENT_STANDARD 400
 #define CHG_THERM_INPUT_LIMIT_CURRENT 1800
-#define CHG_THERM_CHARGING_LIMIT_CURRENT 2500
+#define CHG_THERM_CHARGING_LIMIT_CURRENT 2400
 
 #define SECOND_TERMINATION_CURRENT 4
 
@@ -63,6 +64,19 @@ static int force_block_count;
 #endif
 
 extern int sec_otg_notify(int event);
+extern unsigned int sec_dbg_level;
+
+#define smb_dbg(dev, fmt, arg...)	\
+	do {							\
+		if (sec_dbg_level != KERNEL_SEC_DEBUG_LEVEL_LOW)	\
+			dev_info(dev, fmt, ##arg);	\
+	} while(0)
+
+#define smb_info(dev, fmt, arg...)	\
+	do {							\
+		dev_info(dev, fmt, ##arg);	\
+	} while(0)
+
 
 struct smb1357_charger_data{
 	struct power_supply *psy_bat;
@@ -1553,7 +1567,6 @@ static void smb1357_charger_otg_control(
 				msleep(10);
 			}
 #endif
-#if !defined(CONFIG_SEC_FACTORY)
 			if (smb1357data->revision < CS21_REVISION) {
 				if (smb1357data->ovp_gpio_en) {
 					gpio_set_value(smb1357data->ovp_gpio_en, true);
@@ -1561,7 +1574,6 @@ static void smb1357_charger_otg_control(
 					gpio_set_value(smb1357data->ovp_gpio_en, false);
 				}
 			}
-#endif
 			break;
 	}
 
@@ -2099,7 +2111,9 @@ static bool smb1357_is_pogo_event(struct i2c_client *client)
 						i2c_get_clientdata(client);
 	u8 data_f, data_e, status;
 	bool ret = false;
+	u8 gpio;
 
+	msleep(1);
 	/* Check Inserted Pogo  */
 	smb1357_charger_i2c_read(client, IRQ_F_REG, &data_f);
 	/* Check Removed Pogo */
@@ -2112,6 +2126,14 @@ static bool smb1357_is_pogo_event(struct i2c_client *client)
 		((data_e & IRQ_E_DC_UV_BIT) && ((status & (DCIN_9V|DCIN_LV)) == 0)
 		&&(smb1357data->pogo_status != 0))) {
 			ret = true;
+	}
+
+	gpio = gpio_get_value(smb1357data->pogo_det_gpio);
+	if ((smb1357data->pogo_status != 0) && (gpio == true))
+	{
+		ret = true;
+		dev_info(&client->dev,"%s, pogo status[%d],gpio[%d]",
+			__func__, smb1357data->pogo_status, gpio);
 	}
 
 	dev_info(&client->dev,
@@ -2851,6 +2873,7 @@ static int __devinit smb1357_charger_probe(
 	smb1357data->chg_limit = false;
 	smb1357data->pogo_status = 0;
 	smb1357data->usbin_cable_type = POWER_SUPPLY_TYPE_BATTERY;
+	smb1357data->charger->cable_type = POWER_SUPPLY_TYPE_BATTERY;
 
 	chg_temp_table_size =
 		sizeof(chg_temp_table)/sizeof(sec_bat_adc_table_data_t);

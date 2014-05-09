@@ -384,7 +384,7 @@ static u8 veq_coefficients_wb[][74] = {
 #else
 /* index 0 means max. volume level */
 static u32 veq_max_gains_nb[] = {
-	0x90180003,
+	0x90180004,
 	0x90180003,	
 	0x90180003,
 	0x90180003,
@@ -404,7 +404,7 @@ static u32 veq_noise_estimate_adjs_nb[] = {
 };
 
 static u32 veq_max_gains_wb[] = {
-	0x90180003,
+	0x90180004,
 	0x90180003,	
 	0x90180003,
 	0x90180003,

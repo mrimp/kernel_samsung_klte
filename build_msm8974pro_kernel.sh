@@ -1,10 +1,11 @@
 #!/bin/bash
-# MSM8974 JBP kernel build script v0.4
+# MSM8974PRO KK kernel build script v0.5
 
 BUILD_TOP_DIR=..
 BUILD_KERNEL_DIR=$(pwd)
 
-BUILD_CROSS_COMPILE=../../../prebuilts/gcc/linux-x86/arm/arm-eabi-4.7/bin/arm-eabi-
+SECURE_SCRIPT=$BUILD_TOP_DIR/../buildscript/tools/signclient.jar
+BUILD_CROSS_COMPILE=../prebuilts/gcc/linux-x86/arm/arm-eabi-4.7/bin/arm-eabi-
 BUILD_JOB_NUMBER=`grep processor /proc/cpuinfo|wc -l`
 
 # Default Python version is 2.7
@@ -39,6 +40,25 @@ done
 shift $((OPTIND-1))
 
 BUILD_COMMAND=$1
+SECURE_OPTION=$2
+SEANDROID_OPTION=$3
+
+if [ "$BUILD_COMMAND" == "klte_eur" ]; then
+	SIGN_MODEL=SM-G900F_EUR_XX_ROOT0
+elif [ "$BUILD_COMMAND" == "klte_att" ]; then
+	SIGN_MODEL=SM-G900A_NA_ATT_ROOT0
+elif [ "$BUILD_COMMAND" == "klte_tmo" ]; then
+	SIGN_MODEL=SM-G900T_NA_TMB_ROOT0
+elif [ "$BUILD_COMMAND" == "klte_vzw" ]; then
+	SIGN_MODEL=SM-G900V_NA_VZW_ROOT0
+elif [ "$BUILD_COMMAND" == "klte_spr" ]; then
+	SIGN_MODEL=SM-G900P_NA_SPR_ROOT0
+elif [ "$BUILD_COMMAND" == "klte_usc" ]; then
+	SIGN_MODEL=SM-G900R4_NA_USC_ROOT0
+else
+	SIGN_MODEL=
+fi
+
 MODEL=${BUILD_COMMAND%%_*}
 TEMP=${BUILD_COMMAND#*_}
 REGION=${TEMP%%_*}
@@ -49,6 +69,9 @@ DTS_NAMES=msm8974pro-ac-sec-k-
 #DTS_NAMES=msm8974pro-ac-sec
 PROJECT_NAME=${VARIANT}
 VARIANT_DEFCONFIG=msm8974pro_sec_${MODEL}_${CARRIER}_defconfig
+
+CERTIFICATION=NONCERT
+
 case $1 in
 		clean)
 		#echo "Clean..."
@@ -126,9 +149,9 @@ FUNC_BUILD_DTIMAGE_TARGET()
 	fi
 
 	echo "$DTBTOOL -o $INSTALLED_DTIMAGE_TARGET -s $BOARD_KERNEL_PAGESIZE \
-						-p $BUILD_KERNEL_OUT_DIR/scripts/dtc/ $BUILD_KERNEL_OUT_DIR/arch/arm/boot/"
-	$DTBTOOL -o $INSTALLED_DTIMAGE_TARGET -s $BOARD_KERNEL_PAGESIZE \
-						-p $BUILD_KERNEL_OUT_DIR/scripts/dtc/ $BUILD_KERNEL_OUT_DIR/arch/arm/boot/
+		-p $BUILD_KERNEL_OUT_DIR/scripts/dtc/ $BUILD_KERNEL_OUT_DIR/arch/arm/boot/"
+		$DTBTOOL -o $INSTALLED_DTIMAGE_TARGET -s $BOARD_KERNEL_PAGESIZE \
+		-p $BUILD_KERNEL_OUT_DIR/scripts/dtc/ $BUILD_KERNEL_OUT_DIR/arch/arm/boot/
 
 	chmod a+r $INSTALLED_DTIMAGE_TARGET
 
@@ -142,13 +165,15 @@ FUNC_BUILD_DTIMAGE_TARGET()
 FUNC_BUILD_KERNEL()
 {
 	echo ""
-        echo "=============================================="
-        echo "START : FUNC_BUILD_KERNEL"
-        echo "=============================================="
-        echo ""
-        echo "build project="$PROJECT_NAME""
-        echo "build common config="$KERNEL_DEFCONFIG ""
-        echo "build variant config="$VARIANT_DEFCONFIG ""
+	echo "=============================================="
+	echo "START : FUNC_BUILD_KERNEL"
+	echo "=============================================="
+	echo ""
+	echo "build project="$PROJECT_NAME""
+	echo "build common config="$KERNEL_DEFCONFIG ""
+	echo "build variant config="$VARIANT_DEFCONFIG ""
+	echo "build secure option="$SECURE_OPTION ""
+	echo "build SEANDROID option="$SEANDROID_OPTION ""
 
         if [ "$BUILD_COMMAND" == "" ]; then
                 SECFUNC_PRINT_HELP;
@@ -210,52 +235,87 @@ FUNC_MKBOOTIMG()
 			--ramdisk_offset $BOARD_RAMDISK_OFFSET \
 			--tags_offset $BOARD_KERNEL_TAGS_OFFSET \
 			--dt $INSTALLED_DTIMAGE_TARGET
-	
+
+	if [ "$SEANDROID_OPTION" == "-E" ] ; then
+		FUNC_SEANDROID
+	fi
+
+	if [ "$SECURE_OPTION" == "-B" ]; then
+		FUNC_SECURE_SIGNING
+	fi
+
 	cd $PRODUCT_OUT
-	tar cvf boot_${MODEL}_${CARRIER}.tar boot.img
-	
+	tar cvf boot_${MODEL}_${CARRIER}_${CERTIFICATION}.tar boot.img
+
 	if ! [ -d $BUILD_TOP_DIR/kernel/okernel ] ; then
 		mkdir -p $BUILD_TOP_DIR/kernel/okernel
 	else
-		rm $BUILD_TOP_DIR/kernel/okernel/boot_${MODEL}_${REGION}_${CARRIER}.tar -f
+		rm $BUILD_TOP_DIR/kernel/okernel/boot_${MODEL}_${CARRIER}_${CERTIFICATION}.tar -f
 	fi
 
-	cd ~
-	
+        echo ""
+	echo "================================================="
+        echo "-->Note, copy to $BUILD_TOP_DIR/../output/ directory"
+	echo "================================================="
+	cp $PRODUCT_OUT/boot_${MODEL}_${CARRIER}_${CERTIFICATION}.tar $BUILD_TOP_DIR/../output/boot_${MODEL}_${CARRIER}_${CERTIFICATION}.tar || exit -1
+        cd ~
+
 	echo ""
 	echo "==================================="
 	echo "END   : FUNC_MKBOOTIMG"
 	echo "==================================="
-	echo ""	
+	echo ""
+}
+
+FUNC_SEANDROID()
+{
+	echo -n "SEANDROIDENFORCE" >> $PRODUCT_OUT/boot.img
+}
+
+FUNC_SECURE_SIGNING()
+{
+	echo "java -jar $SECURE_SCRIPT -model $SIGN_MODEL -runtype ss_openssl_sha -input $PRODUCT_OUT/boot.img -output $PRODUCT_OUT/signed_boot.img"
+	openssl dgst -sha256 -binary $PRODUCT_OUT/boot.img > sig_32
+	java -jar $SECURE_SCRIPT -runtype ss_openssl_sha -model $SIGN_MODEL -input sig_32 -output sig_256
+	cat $PRODUCT_OUT/boot.img sig_256 > $PRODUCT_OUT/signed_boot.img
+
+	mv -f $PRODUCT_OUT/boot.img $PRODUCT_OUT/unsigned_boot.img
+	mv -f $PRODUCT_OUT/signed_boot.img $PRODUCT_OUT/boot.img
+
+	CERTIFICATION=CERT
 }
 
 SECFUNC_PRINT_HELP()
 {
-    echo -e '\E[33m'
-    echo "Help"
-    echo "$0 \$1"
-    echo "  \$1 : "
-        echo "  klte_eur"
-        echo "  klte_att"
-        echo "  klte_spr"
-        echo "  klte_tmo"
-        echo "  klte_vzw"
-        echo "  klte_usc"
-        echo -e '\E[0m'
+	echo -e '\E[33m'
+	echo "Help"
+	echo "$0 \$1 \$2 \$3"
+	echo "  \$1 : "
+	echo "      klte_eur"
+	echo "      klte_att"
+	echo "      klte_spr"
+	echo "      klte_tmo"
+	echo "      klte_vzw"
+	echo "      klte_usc"
+	echo "  \$2 : "
+	echo "      -B or Nothing  (-B : Secure Binary)"
+	echo "  \$3 : "
+	echo "      -E or Nothing  (-E : SEANDROID Binary)"
+	echo -e '\E[0m'
 }
 
 
 # MAIN FUNCTION
 rm -rf ./build.log
 (
-    START_TIME=`date +%s`
+	START_TIME=`date +%s`
 
 	FUNC_BUILD_KERNEL
 	#FUNC_RAMDISK_EXTRACT_N_COPY
 	FUNC_MKBOOTIMG
 
-    END_TIME=`date +%s`
-	
-    let "ELAPSED_TIME=$END_TIME-$START_TIME"
-    echo "Total compile time is $ELAPSED_TIME seconds"
+	END_TIME=`date +%s`
+
+	let "ELAPSED_TIME=$END_TIME-$START_TIME"
+	echo "Total compile time is $ELAPSED_TIME seconds"
 ) 2>&1	 | tee -a ./build.log

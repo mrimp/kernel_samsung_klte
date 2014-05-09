@@ -38,9 +38,6 @@
 #include <linux/pn547.h>
 #include <linux/wakelock.h>
 #include <linux/of_gpio.h>
-#ifdef CONFIG_SEC_K_PROJECT
-#include <mach/gpiomux.h>
-#endif
 #ifdef CONFIG_NFC_PN547_CLOCK_REQUEST
 #include <mach/msm_xo.h>
 #include <linux/workqueue.h>
@@ -68,10 +65,6 @@ struct pn547_dev {
 	unsigned int ven_gpio;
 	unsigned int firm_gpio;
 	unsigned int irq_gpio;
-#ifdef CONFIG_SEC_K_PROJECT
-	int scl_gpio;
-	int sda_gpio;
-#endif
 
 	atomic_t irq_enabled;
 	atomic_t read_flag;
@@ -156,100 +149,6 @@ static irqreturn_t pn547_dev_clk_req_irq_handler(int irq, void *dev_id)
 }
 #endif
 
-#ifdef CONFIG_SEC_K_PROJECT
-static int pn547_i2c_recovery(struct pn547_dev *data)
-{
-	int ret, i;
-	struct gpiomux_setting old_config[2];
-	struct gpiomux_setting recovery_config = {
-		.func = GPIOMUX_FUNC_GPIO,
-		.drv = GPIOMUX_DRV_8MA,
-		.pull = GPIOMUX_PULL_NONE,
-	};
-
-	if ((data->sda_gpio < 0) || (data->scl_gpio < 0)) {
-		pr_info("%s - no sda, scl gpio\n", __func__);
-		return -1;
-	}
-
-	pr_info("################# %s #################\n", __func__);
-
-	ret = msm_gpiomux_write(data->sda_gpio, GPIOMUX_ACTIVE,
-			&recovery_config, &old_config[0]);
-	if (ret < 0) {
-		pr_err("%s sda_gpio have no active setting %d\n",
-			__func__, ret);
-		goto exit;
-	}
-
-	ret = msm_gpiomux_write(data->scl_gpio, GPIOMUX_ACTIVE,
-			&recovery_config, &old_config[1]);
-	if (ret < 0) {
-		pr_err("%s scl_gpio have no active setting %d\n",
-			__func__, ret);
-		goto exit;
-	}
-
-	ret = gpio_request(data->sda_gpio, "SENSOR_SDA");
-	if (ret < 0) {
-		pr_err("%s - gpio %d request failed (%d)\n",
-			__func__, data->sda_gpio, ret);
-		goto exit;
-	}
-
-	ret = gpio_request(data->scl_gpio, "SENSOR_SCL");
-	if (ret < 0) {
-		pr_err("%s - gpio %d request failed (%d)\n",
-			__func__, data->scl_gpio, ret);
-		gpio_free(data->scl_gpio);
-		goto exit;
-	}
-
-	ret = gpio_direction_output(data->sda_gpio, 1);
-	if (ret < 0) {
-		pr_err("%s - failed to set gpio %d as output (%d)\n",
-			__func__, data->sda_gpio, ret);
-		goto exit_to_free;
-	}
-
-	ret = gpio_direction_output(data->scl_gpio, 1);
-	if (ret < 0) {
-		pr_err("%s - failed to set gpio %d as output (%d)\n",
-			__func__, data->scl_gpio, ret);
-		goto exit_to_free;
-	}
-
-	for (i = 0; i < 36; i++) {
-		udelay(2);
-		gpio_set_value_cansleep(data->scl_gpio, 0);
-		udelay(2);
-		gpio_set_value_cansleep(data->scl_gpio, 1);
-	}
-
-	ret = gpio_direction_input(data->sda_gpio);
-	if (ret < 0) {
-		pr_err("%s - failed to set gpio %d as input (%d)\n",
-			__func__, data->sda_gpio, ret);
-		goto exit_to_free;
-	}
-
-	ret = gpio_direction_input(data->scl_gpio);
-	if (ret < 0) {
-		pr_err("%s - failed to set gpio %d as input (%d)\n",
-			__func__, data->scl_gpio, ret);
-		goto exit_to_free;
-	}
-
-exit_to_free:
-	gpio_free(data->sda_gpio);
-	gpio_free(data->scl_gpio);
-exit:
-	msm_gpiomux_write(data->sda_gpio, GPIOMUX_ACTIVE, &old_config[0], NULL);
-	msm_gpiomux_write(data->scl_gpio, GPIOMUX_ACTIVE, &old_config[1], NULL);
-
-	return ret;
-}
-#endif
 static ssize_t pn547_dev_read(struct file *filp, char __user *buf,
 			      size_t count, loff_t *offset)
 {
@@ -330,9 +229,6 @@ wait_irq:
 	if (ret < 0) {
 		pr_err("%s: i2c_master_recv returned %d\n", __func__,
 				ret);
-#ifdef CONFIG_SEC_K_PROJECT
-		pn547_i2c_recovery(pn547_dev);
-#endif
 		return ret;
 	}
 
@@ -393,9 +289,6 @@ static ssize_t pn547_dev_write(struct file *filp, const char __user *buf,
 
 	if (ret != count) {
 		pr_err("%s : i2c_master_send returned %d\n", __func__, ret);
-#ifdef CONFIG_SEC_K_PROJECT
-		pn547_i2c_recovery(pn547_dev);
-#endif
 		ret = -EIO;
 	}
 
@@ -429,11 +322,11 @@ static long pn547_dev_ioctl(struct file *filp,
 	#endif
 			gpio_set_value_cansleep(pn547_dev->ven_gpio, 1);
 			gpio_set_value(pn547_dev->firm_gpio, 1);
-			usleep_range(4900, 5000);
+			usleep_range(10000, 10050);
 			gpio_set_value_cansleep(pn547_dev->ven_gpio, 0);
-			usleep_range(4900, 5000);
+			usleep_range(10000, 10050);
 			gpio_set_value_cansleep(pn547_dev->ven_gpio, 1);
-			usleep_range(4900, 5000);
+			usleep_range(10000, 10050);
 			if (atomic_read(&pn547_dev->irq_enabled) == 0) {
 				atomic_set(&pn547_dev->irq_enabled, 1);
 				enable_irq(pn547_dev->client->irq);
@@ -450,7 +343,7 @@ static long pn547_dev_ioctl(struct file *filp,
 			gpio_direction_output(pn547_dev->ven_gpio, 1);
 	#endif
 			gpio_set_value_cansleep(pn547_dev->ven_gpio, 1);
-			usleep_range(4900, 5000);
+			usleep_range(10000, 10050);
 			if (atomic_read(&pn547_dev->irq_enabled) == 0) {
 				atomic_set(&pn547_dev->irq_enabled, 1);
 				enable_irq(pn547_dev->client->irq);
@@ -472,7 +365,7 @@ static long pn547_dev_ioctl(struct file *filp,
 			gpio_direction_output(pn547_dev->ven_gpio, 0);
 	#endif
 			gpio_set_value_cansleep(pn547_dev->ven_gpio, 0);
-			usleep_range(4900, 5000);
+			usleep_range(10000, 10050);
 		} else if (arg == 3) {
 			pr_info("%s Read Cancel\n", __func__);
 			pn547_dev->cancel_read = true;
@@ -530,14 +423,6 @@ static int pn547_parse_dt(struct device *dev,
 	pr_info("%s: irq : %d, ven : %d, firm : %d\n",
 			__func__, pdata->irq_gpio, pdata->ven_gpio,
 			pdata->firm_gpio);
-#ifdef CONFIG_SEC_K_PROJECT
-	pdata->scl_gpio = of_get_named_gpio_flags(np, "pn547,scl-gpio",
-		0, &pdata->scl_gpio_flags);
-	pdata->sda_gpio = of_get_named_gpio_flags(np, "pn547,sda-gpio",
-		0, &pdata->sda_gpio_flags);
-	pr_info("%s: scl : %d, sda : %d\n", __func__,
-		pdata->scl_gpio, pdata->sda_gpio);
-#endif
 	return 0;
 }
 #else
@@ -657,10 +542,6 @@ static int pn547_probe(struct i2c_client *client,
 #ifdef CONFIG_NFC_PN547_CLOCK_REQUEST
 	pn547_dev->clk_req_gpio = platform_data->clk_req_gpio;
 	pn547_dev->clk_req_irq = platform_data->clk_req_irq;
-#endif
-#ifdef CONFIG_SEC_K_PROJECT
-	pn547_dev->scl_gpio = platform_data->scl_gpio;
-	pn547_dev->sda_gpio = platform_data->sda_gpio;
 #endif
 #ifdef CONFIG_NFC_PN547_8226_USE_BBCLK2
 	pn547_dev->clk_req_gpio = platform_data->clk_req_gpio;

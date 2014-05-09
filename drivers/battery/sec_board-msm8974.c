@@ -136,9 +136,9 @@ static struct battery_data_t samsung_battery_data[] = {
 
 
 #if defined(CONFIG_SEC_K_PROJECT) || defined(CONFIG_SEC_KACTIVE_PROJECT)
-#define CAPACITY_MAX			1000
+#define CAPACITY_MAX			990
 #define CAPACITY_MAX_MARGIN	50
-#define CAPACITY_MIN			0
+#define CAPACITY_MIN			-7
 #elif defined(CONFIG_MACH_HLTESKT) || defined(CONFIG_MACH_HLTEKTT) || \
 	defined(CONFIG_MACH_HLTELGT) || defined(CONFIG_MACH_HLTEDCM)\
 	|| defined(CONFIG_MACH_FRESCOLTESKT)||defined(CONFIG_MACH_FRESCOLTEKTT)||defined(CONFIG_MACH_FRESCOLTELGT)

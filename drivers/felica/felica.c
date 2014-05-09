@@ -1216,6 +1216,7 @@ static int felica_pon_open(struct inode *inode, struct file *file)
 {
 	uid_t uid;
 #ifdef FELICA_UICC_FUNCTION
+	int ret = 0;
 	char *cmdpos;
 	static char cmdline[1025];
 	static unsigned long start_adr, end_adr, leng;
@@ -1229,10 +1230,13 @@ static int felica_pon_open(struct inode *inode, struct file *file)
 	if (1024 < leng)
 		leng = 1024;
 	cmdpos = (char *)(current->mm->arg_start);
-	memcpy(cmdline, cmdpos, leng);
+	ret = copy_from_user(cmdline, cmdpos, leng);
 	cmdline[leng] = '\0';
-	FELICA_LOG_DEBUG("[MFDD] %s cmdline[%s]", __func__, cmdline);
-
+	if(ret != 0)
+	{
+		FELICA_LOG_DEBUG("[MFDD] %s cmdline[%s] ret[%d]", __func__, cmdline, ret);
+		return -EFAULT;
+	}
 #endif
 	uid = __task_cred(current)->uid;
 #ifdef FELICA_UICC_FUNCTION
@@ -1547,6 +1551,7 @@ static int felica_cen_open(struct inode *inode, struct file *file)
 {
 	uid_t uid;
 #ifdef FELICA_UICC_FUNCTION
+	int ret = 0;
 	char *cmdpos;
 	static char cmdline[1025];
 	static unsigned long start_adr, end_adr, leng;
@@ -1571,10 +1576,13 @@ static int felica_cen_open(struct inode *inode, struct file *file)
 	if (1024 < leng)
 		leng = 1024;
 	cmdpos = (char *)(current->mm->arg_start);
-	memcpy(cmdline, cmdpos, leng);
+	ret = copy_from_user(cmdline, cmdpos, leng);
 	cmdline[leng] = '\0';
-	FELICA_LOG_DEBUG("[MFDD] %s cmdline[%s]", __func__, cmdline);
-
+	if(ret != 0)
+	{
+		FELICA_LOG_DEBUG("[MFDD] %s cmdline[%s] ret[%d]", __func__, cmdline, ret);
+		return -EFAULT;
+	}
 #endif
 
 	uid = __task_cred(current)->uid;
@@ -2515,6 +2523,7 @@ static void felica_uid_exit(void)
  */
 static int felica_uid_open(struct inode *inode, struct file *file)
 {
+	int ret = 0;
 	char *cmdpos;
 	static char cmdline[1025];
 	static unsigned long start_adr, end_adr, leng;
@@ -2528,8 +2537,13 @@ static int felica_uid_open(struct inode *inode, struct file *file)
 		leng = 1024;
 
 	cmdpos = (char *)(current->mm->arg_start);
-	memcpy(cmdline, cmdpos, leng);
+	ret = copy_from_user(cmdline, cmdpos, leng);
 	cmdline[leng] = '\0';
+	if(ret != 0)
+	{
+		FELICA_LOG_DEBUG("[MFDD] %s cmdline[%s] ret[%d]", __func__, cmdline, ret);
+		return -EFAULT;
+	}
 
 	if (strncmp(cmdline, gdiag_name, leng) != 0) {
 		FELICA_LOG_DEBUG("[MFDD] %s ERROR, %s gdiag %s", \
@@ -5292,6 +5306,7 @@ static int snfc_cen_open(struct inode *inode, struct file *file)
 {
 	uid_t uid;
 #ifdef FELICA_UICC_FUNCTION
+	int ret = 0;
 	char *cmdpos;
 	static char cmdline[1025];
 	static unsigned long start_adr, end_adr, leng;
@@ -5316,10 +5331,13 @@ static int snfc_cen_open(struct inode *inode, struct file *file)
 	if (1024 < leng)
 		leng = 1024;
 	cmdpos = (char *)(current->mm->arg_start);
-	memcpy(cmdline, cmdpos, leng);
+	ret = copy_from_user(cmdline, cmdpos, leng);
 	cmdline[leng] = '\0';
-	FELICA_LOG_DEBUG("[MFDD] %s cmdline[%s]", __func__, cmdline);
-
+	if(ret != 0)
+	{
+		FELICA_LOG_DEBUG("[MFDD] %s cmdline[%s] ret[%d]", __func__, cmdline, ret);
+		return -EFAULT;
+	}
 #endif
 
 	uid = __task_cred(current)->uid;
